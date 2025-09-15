@@ -9,95 +9,103 @@ import { UC } from "./context";
 interface ProductsProps {
   products: ProductsTypes;
   gap?: string;
+  currency?: "usd" | "jpy"; // NEW
 }
 
-const Products = ({ products, gap }: ProductsProps) => {
+const Products = ({ products, gap, currency = "usd" }: ProductsProps) => {
   const [isLoaded, setIsloaded] = useState<boolean>(false);
   const { onAdd, cartItems } = useContext(UC);
-
-  //  UPDATE THE COMP TO SHOW FAV
   const [update, setUpdate] = useState<boolean>(false);
-
   const imageProps = useNextSanityImage(client, products.image[0]);
 
   useEffect(() => {
     setIsloaded(true);
   }, []);
-  const saveToLocalS = (product: ProductsTypes) => {
-    if (localStorage.trxfav) {
-      if (
-        JSON.parse(localStorage.trxfav).filter(
-          (each: ProductsTypes) => each._id == product._id
-        ).length >= 1
-      ) {
-        const filterd = JSON.parse(localStorage.trxfav).filter(
-          (each: ProductsTypes) => each._id != product._id
-        );
-        localStorage.setItem("trxfav", JSON.stringify(filterd));
-      } else {
-        localStorage.setItem(
-          "trxfav",
-          JSON.stringify([...JSON.parse(localStorage.trxfav), product])
-        );
-      }
-    } else {
-      localStorage.setItem("trxfav", JSON.stringify([product]));
+
+  // === Format price
+  const formatPrice = (price: number) => {
+    if (currency === "jpy") {
+      return new Intl.NumberFormat("ja-JP", {
+        style: "currency",
+        currency: "JPY",
+      }).format(price * 150); // assume 1 USD ≈ 150 JPY
     }
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(price);
   };
 
   return (
     <div
-      className={` ${gap} grid justify-center hover:scale-105
+      className={` ${gap ?? ""} grid justify-center hover:scale-105
      transition my-5 `}
     >
       <div
-        className=" relative cursor-pointer shadow-sm shadow-lightDim overflow-hidden
+        className="relative cursor-pointer shadow-sm shadow-lightDim overflow-hidden
             rounded-md h-32 w-32 sm:h-40 sm:w-40 lg:h-56 lg:w-56"
       >
-        {/* === IMAGE */}
         <Link href={`/product/${products.slug.current}`}>
-          <Img className="object-cover" alt="headphone" {...imageProps} />
+          <Img className="object-cover" alt={products.name} {...imageProps} />
         </Link>
 
-        <div className=" absolute h-2/4 w-full bg-lightDim1 bottom-0 z-[-2]"></div>
+        <div className="absolute h-2/4 w-full bg-lightDim1 bottom-0 z-[-2]"></div>
       </div>
 
       {/* === NAME & PRICE */}
-      <section className=" mx-1 sm:mx-2 flex mt-2 items-center justify-between">
-        <nav className=" text-sm font-normal sm:font-medium">
-          <p> {products.name} </p>
-          <div className=" flex gap-3">
-            <span className=" text-sm text-lightGray line-through ">
-              ${products.oldPrice}
+      <section className="mx-1 sm:mx-2 flex mt-2 items-center justify-between">
+        <nav className="text-sm font-normal sm:font-medium">
+          <p>{products.name}</p>
+          <div className="flex gap-3">
+            <span className="text-sm text-lightGray line-through ">
+              {formatPrice(products.oldPrice)}
             </span>
-            <b className=" text-zinc-900 "> ${products.price} </b>
+            <b className="text-zinc-900 ">{formatPrice(products.price)}</b>
           </div>
         </nav>
 
-        {/* // FAV and BAG */}
-        <div className=" flex justify-between gap-5 items-center">
-          {/* === FAV ICON */}
+        {/* === FAV + CART */}
+        <div className="flex justify-between gap-5 items-center">
+          {/* FAV ICON */}
           {isLoaded && (
             <svg
               onClick={() => {
-                saveToLocalS(products);
+                // localStorage fav logic stays the same...
+                if (localStorage.trxfav) {
+                  if (
+                    JSON.parse(localStorage.trxfav).filter(
+                      (each: ProductsTypes) => each._id === products._id
+                    ).length >= 1
+                  ) {
+                    const filterd = JSON.parse(localStorage.trxfav).filter(
+                      (each: ProductsTypes) => each._id !== products._id
+                    );
+                    localStorage.setItem("trxfav", JSON.stringify(filterd));
+                  } else {
+                    localStorage.setItem(
+                      "trxfav",
+                      JSON.stringify([...JSON.parse(localStorage.trxfav), products])
+                    );
+                  }
+                } else {
+                  localStorage.setItem("trxfav", JSON.stringify([products]));
+                }
                 setUpdate((p) => !p);
               }}
               className={`h-6 stroke-lightGray hover:stroke-love self-start 
           sm:hover:fill-love transition-colors cursor-pointer
-          duration-1000 text-lightDim1 z-10 ${
-            window.localStorage.trxfav &&
-            JSON.parse(localStorage.trxfav).filter(
-              (each: ProductsTypes) => each._id == products._id
-            ).length >= 1 &&
-            "fill-love stroke-love"
-          }`}
+          duration-1000 text-lightDim1 z-10 ${window.localStorage.trxfav &&
+                JSON.parse(localStorage.trxfav).filter(
+                  (each: ProductsTypes) => each._id === products._id
+                ).length >= 1 &&
+                "fill-love stroke-love"
+                }`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="none"
               strokeWidth={1.5}
             >
-              <title> Add To Favorite</title>
+              <title>Add To Favorite</title>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -107,16 +115,16 @@ const Products = ({ products, gap }: ProductsProps) => {
             </svg>
           )}
 
+          {/* CART ICON */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
             className={`w-6 h-6 cursor-pointer hidden sm:block text-lightGray
-            hover:stroke-dim stroke-[1.5] ${
-              cartItems.filter((item: any) => item._id == products._id)
+            hover:stroke-dim stroke-[1.5] ${cartItems.filter((item: ProductsTypes) => item._id === products._id)
                 .length >= 1 && "text-dim stroke-[2]"
-            }`}
+              }`}
             onClick={() => onAdd(products, 1)}
           >
             <path
